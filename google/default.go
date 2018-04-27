@@ -41,23 +41,24 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 
 // Common implementation for FindDefaultCredentials.
 func findDefaultCredentials(ctx context.Context, scopes []string) (*DefaultCredentials, error) {
+	// Store first error we might encounter.
+	var err error
+
 	// First, try the environment variable.
 	const envVar = "GOOGLE_APPLICATION_CREDENTIALS"
 	if filename := os.Getenv(envVar); filename != "" {
-		creds, err := readCredentialsFile(ctx, filename, scopes)
-		if err != nil {
-			return nil, fmt.Errorf("google: error getting credentials using %v environment variable: %v", envVar, err)
+		if creds, err := readCredentialsFile(ctx, filename, scopes); err == nil {
+			return creds, nil
 		}
-		return creds, nil
+		err = fmt.Errorf("google: error getting credentials using %v environment variable: %v", envVar, err)
 	}
 
 	// Second, try a well-known file.
 	filename := wellKnownFile()
 	if creds, err := readCredentialsFile(ctx, filename, scopes); err == nil {
 		return creds, nil
-	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("google: error getting credentials using well-known file (%v): %v", filename, err)
 	}
+	err = fmt.Errorf("google: error getting credentials using well-known file (%v): %v", filename, err)
 
 	// Third, if we're on Google App Engine use those credentials.
 	if appengineTokenFunc != nil && !appengineFlex {
@@ -77,8 +78,11 @@ func findDefaultCredentials(ctx context.Context, scopes []string) (*DefaultCrede
 	}
 
 	// None are found; return helpful error.
-	const url = "https://developers.google.com/accounts/docs/application-default-credentials"
-	return nil, fmt.Errorf("google: could not find default credentials. See %v for more information.", url)
+	if err == nil {
+		const url = "https://developers.google.com/accounts/docs/application-default-credentials"
+		err = fmt.Errorf("google: could not find default credentials. See %v for more information", url)
+	}
+	return nil, err
 }
 
 // Common implementation for CredentialsFromJSON.
