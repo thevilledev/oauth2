@@ -57,8 +57,9 @@ func findDefaultCredentials(ctx context.Context, scopes []string) (*DefaultCrede
 	filename := wellKnownFile()
 	if creds, err := readCredentialsFile(ctx, filename, scopes); err == nil {
 		return creds, nil
+	} else if !os.IsNotExist(err) {
+		err = fmt.Errorf("google: error getting credentials using well-known file (%v): %v", filename, err)
 	}
-	err = fmt.Errorf("google: error getting credentials using well-known file (%v): %v", filename, err)
 
 	// Third, if we're on Google App Engine use those credentials.
 	if appengineTokenFunc != nil && !appengineFlex {
